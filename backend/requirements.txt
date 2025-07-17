@@ -23,3 +23,23 @@ numpy>=1.26.0
 python-multipart>=0.0.9
 jq>=1.6.0
 typer>=0.9.0
+
+# Web3 and Blockchain Integration
+web3==6.15.1
+eth-brownie==1.20.4
+brownie-token-tester==0.3.2
+py-solc-x==1.12.0
+
+# Gas Price and Oracle APIs
+requests-cache>=1.1.1
+aiohttp>=3.9.0
+websockets>=12.0
+
+# Additional Analytics
+redis>=5.0.1
+celery>=5.3.0
+
+# Smart Contract ABI Management
+eth-abi>=5.0.0
+eth-utils>=3.0.0
+hexbytes>=0.3.1
