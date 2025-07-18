@@ -596,7 +596,7 @@ constructor() {
 - [ ] White-label solution for other protocols
 
 ---
-
+----
 ## 🤝 Contributing
 
 We welcome contributions from the community! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details on:
