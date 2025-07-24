@@ -1,167 +1,166 @@
-import { useState, useEffect, useCallback } from 'react';
-import { useAccount } from 'wagmi';
-import { OptimizationQuote, UserPreferences } from '../types/optimization';
+import { useState, useCallback, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { OptimizationQuote, UserPreferences, ChainComparison } from '../types/optimization';
 import { SwapParams } from '../types/swap';
-import { DEFAULT_SETTINGS } from '../utils/constants';
-import { getLocalStorageItem, setLocalStorageItem } from '../utils/helpers';
 import { gasOptimizationApi } from '../services/api/gasOptimizationApi';
 
-export const useGasOptimization = () => {
-  const { address, isConnected } = useAccount();
-  const [optimizationQuote, setOptimizationQuote] = useState<OptimizationQuote | null>(null);
-  const [isOptimizing, setIsOptimizing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [shouldOptimize, setShouldOptimize] = useState(false);
+const DEFAULT_PREFERENCES: UserPreferences = {
+  min_savings_threshold_bps: 500, // 5%
+  min_absolute_savings_usd: 10.0,
+  max_bridge_time_seconds: 1800, // 30 minutes
+  enable_cross_chain_optimization: true,
+  enable_usd_display: true,
+  enable_mev_protection: true,
+  receive_notifications: true,
+};
+
+interface UseGasOptimizationReturn {
+  // State
+  optimizationQuote: OptimizationQuote | null;
+  userPreferences: UserPreferences;
+  isOptimizing: boolean;
+  shouldOptimize: boolean;
+  chainComparison: ChainComparison[] | null;
   
+  // Actions
+  getOptimizationQuote: (swapParams: SwapParams) => Promise<void>;
+  updateUserPreferences: (preferences: Partial<UserPreferences>) => void;
+  resetPreferences: () => void;
+  
+  // Computed
+  potentialSavingsUSD: number;
+  potentialSavingsPercentage: number;
+  optimalChain: number | null;
+  estimatedExecutionTime: number;
+}
+
+export const useGasOptimization = (): UseGasOptimizationReturn => {
+  const [optimizationQuote, setOptimizationQuote] = useState<OptimizationQuote | null>(null);
+  const [userPreferences, setUserPreferences] = useState<UserPreferences>(DEFAULT_PREFERENCES);
+  const [currentSwapParams, setCurrentSwapParams] = useState<SwapParams | null>(null);
+
   // Load user preferences from localStorage
-  const [userPreferences, setUserPreferences] = useState<UserPreferences>(() => {
-    const stored = getLocalStorageItem('gasopt_user_preferences', null);
-    return stored || {
-      minSavingsThresholdBPS: DEFAULT_SETTINGS.MIN_SAVINGS_THRESHOLD * 100,
-      minAbsoluteSavingsUSD: DEFAULT_SETTINGS.MIN_ABSOLUTE_SAVINGS,
-      maxBridgeTime: DEFAULT_SETTINGS.MAX_BRIDGE_TIME * 60,
-      enableCrossChainOptimization: DEFAULT_SETTINGS.ENABLE_CROSS_CHAIN,
-      enableUSDDisplay: DEFAULT_SETTINGS.ENABLE_USD_DISPLAY,
-      enableMEVProtection: DEFAULT_SETTINGS.ENABLE_MEV_PROTECTION,
-      receiveNotifications: DEFAULT_SETTINGS.ENABLE_NOTIFICATIONS,
-      preferredChains: [],
-      excludedChains: [],
-    };
+  useEffect(() => {
+    const savedPreferences = localStorage.getItem('gasOptimization_userPreferences');
+    if (savedPreferences) {
+      try {
+        const parsed = JSON.parse(savedPreferences);
+        setUserPreferences({ ...DEFAULT_PREFERENCES, ...parsed });
+      } catch (error) {
+        console.error('Error loading user preferences:', error);
+      }
+    }
+  }, []);
+
+  // Save user preferences to localStorage
+  useEffect(() => {
+    localStorage.setItem('gasOptimization_userPreferences', JSON.stringify(userPreferences));
+  }, [userPreferences]);
+
+  // Fetch optimization quote
+  const { 
+    data: quoteData, 
+    isLoading: isOptimizing, 
+    refetch: refetchQuote 
+  } = useQuery({
+    queryKey: ['optimization-quote', currentSwapParams],
+    queryFn: async () => {
+      if (!currentSwapParams) return null;
+      return gasOptimizationApi.getOptimizationQuote(currentSwapParams);
+    },
+    enabled: !!currentSwapParams,
+    staleTime: 30000, // 30 seconds
+    refetchInterval: 60000, // Refetch every minute
   });
 
-  // Save preferences to localStorage when they change
+  // Update optimization quote when data changes
   useEffect(() => {
-    setLocalStorageItem('gasopt_user_preferences', userPreferences);
-  }, [userPreferences]);
+    if (quoteData) {
+      setOptimizationQuote(quoteData);
+    }
+  }, [quoteData]);
 
-  // Update preferences
-  const updatePreferences = useCallback((newPreferences: Partial<UserPreferences>) => {
-    setUserPreferences(prev => ({ ...prev, ...newPreferences }));
+  const getOptimizationQuote = useCallback(async (swapParams: SwapParams) => {
+    setCurrentSwapParams(swapParams);
+    refetchQuote();
+  }, [refetchQuote]);
+
+  const updateUserPreferences = useCallback((preferences: Partial<UserPreferences>) => {
+    setUserPreferences(prev => ({ ...prev, ...preferences }));
   }, []);
 
-  // Get optimization quote
-  const getOptimizationQuote = useCallback(async (
-    swapParams: SwapParams
-  ): Promise<OptimizationQuote | null> => {
-    if (!isConnected || !address) {
-      setError('Wallet not connected');
-      return null;
-    }
-
-    if (!userPreferences.enableCrossChainOptimization) {
-      return null;
-    }
-
-    setIsOptimizing(true);
-    setError(null);
-
-    try {
-      const quote = await gasOptimizationApi.getOptimizationQuote({
-        tokenIn: swapParams.tokenIn.address,
-        tokenOut: swapParams.tokenOut.address,
-        amountIn: swapParams.amountIn,
-        user: address,
-        preferences: userPreferences,
-      });
-
-      setOptimizationQuote(quote);
-      setShouldOptimize(quote.shouldOptimize);
-      return quote;
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to get optimization quote';
-      setError(errorMessage);
-      return null;
-    } finally {
-      setIsOptimizing(false);
-    }
-  }, [address, isConnected, userPreferences]);
-
-  // Clear optimization data
-  const clearOptimization = useCallback(() => {
-    setOptimizationQuote(null);
-    setShouldOptimize(false);
-    setError(null);
+  const resetPreferences = useCallback(() => {
+    setUserPreferences(DEFAULT_PREFERENCES);
+    localStorage.removeItem('gasOptimization_userPreferences');
   }, []);
 
-  // Check if optimization is beneficial
-  const isOptimizationBeneficial = useCallback((quote: OptimizationQuote): boolean => {
-    if (!quote) return false;
-    
-    return (
-      quote.savingsUSD >= userPreferences.minAbsoluteSavingsUSD &&
-      quote.savingsPercent >= userPreferences.minSavingsThresholdBPS / 100 &&
-      quote.estimatedTime <= userPreferences.maxBridgeTime
-    );
-  }, [userPreferences]);
+  // Generate chain comparison data
+  const chainComparison: ChainComparison[] | null = optimizationQuote ? [
+    {
+      chainId: optimizationQuote.original_chain_id,
+      chainName: getChainName(optimizationQuote.original_chain_id),
+      gasCostUSD: optimizationQuote.cost_breakdown.original_gas_cost,
+      bridgeFeeUSD: 0,
+      totalCostUSD: optimizationQuote.original_cost_usd,
+      executionTime: 30, // seconds
+      isOptimal: false,
+    },
+    {
+      chainId: optimizationQuote.optimized_chain_id,
+      chainName: getChainName(optimizationQuote.optimized_chain_id),
+      gasCostUSD: optimizationQuote.cost_breakdown.optimized_gas_cost,
+      bridgeFeeUSD: optimizationQuote.cost_breakdown.bridge_fee,
+      totalCostUSD: optimizationQuote.optimized_cost_usd,
+      executionTime: optimizationQuote.estimated_bridge_time,
+      isOptimal: true,
+      savingsUSD: optimizationQuote.savings_usd,
+      savingsPercentage: optimizationQuote.savings_percentage,
+    },
+  ] : null;
 
-  // Get savings display text
-  const getSavingsDisplay = useCallback((quote: OptimizationQuote): string => {
-    if (!quote || !quote.shouldOptimize) return '';
-    
-    const savingsUSD = quote.savingsUSD.toFixed(2);
-    const savingsPercent = quote.savingsPercent.toFixed(1);
-    
-    return userPreferences.enableUSDDisplay 
-      ? `Save $${savingsUSD} (${savingsPercent}%)`
-      : `Save ${savingsPercent}%`;
-  }, [userPreferences.enableUSDDisplay]);
+  // Computed values
+  const shouldOptimize = !!(
+    optimizationQuote?.should_optimize &&
+    userPreferences.enable_cross_chain_optimization &&
+    optimizationQuote.savings_usd >= userPreferences.min_absolute_savings_usd &&
+    optimizationQuote.savings_percentage >= (userPreferences.min_savings_threshold_bps / 100) &&
+    optimizationQuote.estimated_bridge_time <= userPreferences.max_bridge_time_seconds
+  );
 
-  // Get optimization recommendation
-  const getOptimizationRecommendation = useCallback((quote: OptimizationQuote): {
-    action: 'optimize' | 'stay' | 'wait';
-    reason: string;
-  } => {
-    if (!quote) return { action: 'stay', reason: 'No quote available' };
-    
-    if (!quote.shouldOptimize) {
-      return { action: 'stay', reason: 'Current chain is optimal' };
-    }
-    
-    if (quote.savingsUSD < userPreferences.minAbsoluteSavingsUSD) {
-      return { action: 'stay', reason: 'Savings below threshold' };
-    }
-    
-    if (quote.estimatedTime > userPreferences.maxBridgeTime) {
-      return { action: 'wait', reason: 'Bridge time too long' };
-    }
-    
-    return { action: 'optimize', reason: 'Optimization recommended' };
-  }, [userPreferences]);
-
-  // Auto-refresh optimization quote
-  useEffect(() => {
-    let intervalId: NodeJS.Timeout;
-    
-    if (optimizationQuote && isConnected) {
-      intervalId = setInterval(() => {
-        // Refresh quote every 30 seconds
-        // This would typically re-run the optimization check
-      }, 30000);
-    }
-    
-    return () => {
-      if (intervalId) {
-        clearInterval(intervalId);
-      }
-    };
-  }, [optimizationQuote, isConnected]);
+  const potentialSavingsUSD = optimizationQuote?.savings_usd || 0;
+  const potentialSavingsPercentage = optimizationQuote?.savings_percentage || 0;
+  const optimalChain = optimizationQuote?.optimized_chain_id || null;
+  const estimatedExecutionTime = optimizationQuote?.estimated_bridge_time || 0;
 
   return {
     // State
     optimizationQuote,
-    isOptimizing,
-    error,
-    shouldOptimize,
     userPreferences,
+    isOptimizing,
+    shouldOptimize,
+    chainComparison,
     
     // Actions
     getOptimizationQuote,
-    clearOptimization,
-    updatePreferences,
+    updateUserPreferences,
+    resetPreferences,
     
-    // Computed values
-    isOptimizationBeneficial,
-    getSavingsDisplay,
-    getOptimizationRecommendation,
+    // Computed
+    potentialSavingsUSD,
+    potentialSavingsPercentage,
+    optimalChain,
+    estimatedExecutionTime,
   };
 };
+
+// Helper function to get chain name
+function getChainName(chainId: number): string {
+  const chainNames: Record<number, string> = {
+    1: 'Ethereum',
+    42161: 'Arbitrum',
+    10: 'Optimism',
+    137: 'Polygon',
+    8453: 'Base',
+  };
+  return chainNames[chainId] || `Chain ${chainId}`;
+}

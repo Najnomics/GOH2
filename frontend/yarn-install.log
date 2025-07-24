@@ -1,0 +1,25 @@
+yarn install v1.22.22
+[1/4] Resolving packages...
+[2/4] Fetching packages...
+warning eciesjs@0.4.15: The engine "bun" appears to be invalid.
+warning eciesjs@0.4.15: The engine "deno" appears to be invalid.
+warning @ecies/ciphers@0.2.4: The engine "bun" appears to be invalid.
+warning @ecies/ciphers@0.2.4: The engine "deno" appears to be invalid.
+[3/4] Linking dependencies...
+warning "@wagmi/connectors > @walletconnect/ethereum-provider > @reown/appkit > valtio > use-sync-external-store@1.2.0" has incorrect peer dependency "react@^16.8.0 || ^17.0.0 || ^18.0.0".
+warning " > react-redux@8.1.3" has incorrect peer dependency "react@^16.8 || ^17.0 || ^18.0".
+warning "react-scripts > eslint-config-react-app > eslint-plugin-flowtype@8.0.3" has unmet peer dependency "@babel/plugin-syntax-flow@^7.14.5".
+warning "react-scripts > eslint-config-react-app > eslint-plugin-flowtype@8.0.3" has unmet peer dependency "@babel/plugin-transform-react-jsx@^7.14.9".
+warning "react-scripts > react-dev-utils > fork-ts-checker-webpack-plugin@6.5.3" has unmet peer dependency "typescript@>= 2.7".
+warning "react-scripts > eslint-config-react-app > @typescript-eslint/eslint-plugin > tsutils@3.21.0" has unmet peer dependency "typescript@>=2.8.0 || >= 3.2.0-dev || >= 3.3.0-dev || >= 3.4.0-dev || >= 3.5.0-dev || >= 3.6.0-dev || >= 3.6.0-beta || >= 3.7.0-dev || >= 3.7.0-beta".
+warning "web3 > web3-eth-abi > abitype@0.7.1" has unmet peer dependency "typescript@>=4.9.4".
+warning "@craco/craco > cosmiconfig-typescript-loader@1.0.9" has unmet peer dependency "@types/node@*".
+warning "@craco/craco > cosmiconfig-typescript-loader@1.0.9" has unmet peer dependency "typescript@>=3".
+warning "@craco/craco > cosmiconfig-typescript-loader > ts-node@10.9.2" has unmet peer dependency "@types/node@*".
+warning "@craco/craco > cosmiconfig-typescript-loader > ts-node@10.9.2" has unmet peer dependency "typescript@>=2.7".
+warning Workspaces can only be enabled in private projects.
+warning Workspaces can only be enabled in private projects.
+warning Workspaces can only be enabled in private projects.
+warning Workspaces can only be enabled in private projects.
+[4/4] Building fresh packages...
+Done in 30.68s.

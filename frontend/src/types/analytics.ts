@@ -1,93 +1,66 @@
-// Analytics-related types
-export interface UserStats {
-  totalSwaps: number;
-  totalSavingsUSD: number;
-  avgSavingsPercent: number;
-  avgExecutionTime: number;
-  favoriteChains: number[];
-  totalVolumeUSD: number;
-  crossChainSwaps: number;
-  localSwaps: number;
-  joinedAt: number;
+export interface SystemAnalytics {
+  total_swaps_processed: number;
+  total_savings_usd: number;
+  cross_chain_swap_percentage: number;
+  average_savings_percentage: number;
+  most_popular_chains: PopularChain[];
+  last_24h_volume_usd: number;
 }
 
-export interface SystemMetrics {
-  totalSwaps: number;
-  totalSavingsUSD: number;
-  totalUsers: number;
-  totalVolumeUSD: number;
-  avgSavingsPercent: number;
-  avgExecutionTime: number;
-  successRate: number;
-  crossChainPercent: number;
-  mostUsedChains: ChainUsage[];
+export interface PopularChain {
+  chain_id: number;
+  name: string;
+  usage_percentage: number;
+  volume_usd?: number;
 }
 
-export interface ChainUsage {
-  chainId: number;
-  chainName: string;
-  swapCount: number;
-  volumeUSD: number;
-  savingsUSD: number;
-  percentage: number;
+export interface UserAnalytics {
+  user_address: string;
+  total_swaps: number;
+  total_savings_usd: number;
+  average_savings_percentage: number;
+  favorite_chains: string[];
+  total_volume_usd: number;
+  member_since: string;
 }
 
-export interface TimeSeriesData {
+export interface ChartData {
   timestamp: number;
   value: number;
   label?: string;
 }
 
-export interface ChartData {
-  labels: string[];
-  datasets: {
-    label: string;
-    data: number[];
-    borderColor: string;
-    backgroundColor: string;
-    fill?: boolean;
-  }[];
+export interface GasPriceHistory {
+  chainId: number;
+  data: ChartData[];
 }
 
-export interface SavingsChart {
-  period: '1h' | '1d' | '1w' | '1m' | '3m' | '1y';
-  data: TimeSeriesData[];
+export interface SavingsHistory {
+  daily: ChartData[];
+  weekly: ChartData[];
+  monthly: ChartData[];
+}
+
+export interface VolumeData {
+  chainId: number;
+  chainName: string;
+  volume: number;
+  volumeUSD: number;
+  percentage: number;
+}
+
+export interface DashboardMetrics {
+  totalValueLocked: number;
+  dailyVolume: number;
   totalSavings: number;
-  avgSavings: number;
-  trend: 'up' | 'down' | 'stable';
+  activeUsers: number;
+  averageGasPrice: number;
+  systemUptime: number;
 }
 
-export interface GasPriceChart {
-  period: '1h' | '1d' | '1w' | '1m';
-  chains: {
-    chainId: number;
-    data: TimeSeriesData[];
-  }[];
-  predictions?: {
-    chainId: number;
-    predicted: TimeSeriesData[];
-    confidence: number;
-  }[];
-}
-
-export interface VolumeChart {
-  period: '1d' | '1w' | '1m' | '3m' | '1y';
-  data: TimeSeriesData[];
-  totalVolume: number;
-  avgVolume: number;
-  growth: number;
-}
-
-export interface OptimizationStats {
-  optimizationRate: number;
-  avgSavingsUSD: number;
-  avgSavingsPercent: number;
-  totalOptimizations: number;
-  skippedOptimizations: number;
-  topSavingPairs: {
-    tokenIn: string;
-    tokenOut: string;
-    avgSavings: number;
-    count: number;
-  }[];
+export interface PerformanceMetrics {
+  totalSwaps: number;
+  successRate: number;
+  averageSavings: number;
+  chainPerformance: number[];
 }

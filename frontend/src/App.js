@@ -3,12 +3,15 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'react-hot-toast';
 
+// Layout
+import { Layout } from './components/common/Layout';
+
 // Pages
 import Swap from './pages/Swap';
 import Analytics from './pages/Analytics';
 
 // Styles
-import './App.css';
+import './styles/globals.css';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -25,12 +28,20 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <Router>
-        <div className="App">
+        <Layout>
           <Routes>
             <Route path="/" element={<Swap />} />
             <Route path="/analytics" element={<Analytics />} />
-            <Route path="/history" element={<div className="min-h-screen bg-gray-50 flex items-center justify-center"><div className="text-2xl text-gray-600">History Page - Coming Soon</div></div>} />
-            <Route path="/settings" element={<div className="min-h-screen bg-gray-50 flex items-center justify-center"><div className="text-2xl text-gray-600">Settings Page - Coming Soon</div></div>} />
+            <Route path="/history" element={
+              <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+                <div className="text-2xl text-gray-600">History Page - Coming Soon</div>
+              </div>
+            } />
+            <Route path="/settings" element={
+              <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+                <div className="text-2xl text-gray-600">Settings Page - Coming Soon</div>
+              </div>
+            } />
           </Routes>
 
           {/* Global Toast Notifications */}
@@ -71,7 +82,7 @@ function App() {
               },
             }}
           />
-        </div>
+        </Layout>
       </Router>
     </QueryClientProvider>
   );

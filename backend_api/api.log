@@ -1,6 +1,4 @@
-INFO:     Started server process [807]
-INFO:     Waiting for application startup.
-INFO:     Application startup complete.
-ERROR:    [Errno 98] error while attempting to bind on address ('0.0.0.0', 8001): address already in use
-INFO:     Waiting for application shutdown.
-INFO:     Application shutdown complete.
+Traceback (most recent call last):
+  File "/app/goh2/backend_api/server.py", line 9, in <module>
+    from web3 import Web3
+ModuleNotFoundError: No module named 'web3'

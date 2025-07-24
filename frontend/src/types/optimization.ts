@@ -1,74 +1,66 @@
-// Optimization-related types
 export interface OptimizationQuote {
-  shouldOptimize: boolean;
-  originalChainId: number;
-  optimizedChainId: number;
-  originalCostUSD: number;
-  optimizedCostUSD: number;
-  savingsUSD: number;
-  savingsPercent: number;
-  estimatedTime: number;
-  requiresBridge: boolean;
-  costBreakdown: CostBreakdown;
-  chainComparison: ChainComparison[];
-  bridgeInfo?: BridgeInfo;
-  bridgeData?: string;
+  original_chain_id: number;
+  optimized_chain_id: number;
+  original_cost_usd: number;
+  optimized_cost_usd: number;
+  savings_usd: number;
+  savings_percentage: number;
+  estimated_bridge_time: number;
+  should_optimize: boolean;
+  cost_breakdown: CostBreakdown;
 }
 
 export interface CostBreakdown {
-  gasCostUSD: number;
-  bridgeFeeUSD: number;
-  slippageCostUSD: number;
-  totalCostUSD: number;
-  mevProtectionFee?: number;
+  original_gas_cost: number;
+  optimized_gas_cost: number;
+  bridge_fee: number;
+  total_original: number;
+  total_optimized: number;
+  slippage_cost?: number;
+  mev_protection_fee?: number;
+}
+
+export interface UserPreferences {
+  min_savings_threshold_bps: number; // basis points (500 = 5%)
+  min_absolute_savings_usd: number;
+  max_bridge_time_seconds: number;
+  enable_cross_chain_optimization: boolean;
+  enable_usd_display: boolean;
+  enable_mev_protection?: boolean;
+  receive_notifications?: boolean;
 }
 
 export interface ChainComparison {
   chainId: number;
   chainName: string;
-  gasPrice: number;
   gasCostUSD: number;
+  bridgeFeeUSD: number;
   totalCostUSD: number;
   executionTime: number;
-  savings: number;
-  savingsPercent: number;
   isOptimal: boolean;
+  savingsUSD?: number;
+  savingsPercentage?: number;
 }
 
 export interface BridgeInfo {
-  provider: string;
+  protocol: string;
   estimatedTime: number;
   fee: number;
   feeUSD: number;
-  route: string[];
-  success_rate: number;
+  steps: BridgeStep[];
 }
 
-export interface UserPreferences {
-  minSavingsThresholdBPS: number;
-  minAbsoluteSavingsUSD: number;
-  maxBridgeTime: number;
-  enableCrossChainOptimization: boolean;
-  enableUSDDisplay: boolean;
-  enableMEVProtection: boolean;
-  receiveNotifications: boolean;
-  preferredChains: number[];
-  excludedChains: number[];
+export interface BridgeStep {
+  type: 'bridge' | 'swap';
+  description: string;
+  estimatedTime: number;
+  status: 'pending' | 'in-progress' | 'completed' | 'failed';
 }
 
 export interface OptimizationSettings {
-  autoOptimize: boolean;
-  savingsThreshold: number;
+  enableAutomaticOptimization: boolean;
   maxBridgeTime: number;
-  enableNotifications: boolean;
+  minSavingsThreshold: number;
   preferredChains: number[];
-}
-
-export interface OptimizationAnalysis {
-  isOptimal: boolean;
-  currentChainCost: number;
-  optimalChainCost: number;
-  potentialSavings: number;
-  recommendedAction: 'optimize' | 'stay' | 'wait';
-  reason: string;
+  excludedChains: number[];
 }

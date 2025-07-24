@@ -1,0 +1,122 @@
+/* Analytics Dashboard Styles */
+.analytics-dashboard {
+  @apply min-h-screen p-6;
+  background: var(--bg-secondary);
+}
+
+.dashboard-header {
+  @apply mb-8;
+}
+
+.dashboard-title {
+  @apply text-3xl font-bold mb-2;
+  color: var(--text-primary);
+  font-weight: var(--font-bold);
+}
+
+.dashboard-subtitle {
+  color: var(--text-secondary);
+}
+
+.metrics-grid {
+  @apply grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8;
+}
+
+.metric-card {
+  @apply p-6 rounded-xl border;
+  background: var(--bg-card);
+  border-color: var(--border-primary);
+}
+
+.metric-title {
+  @apply text-sm font-medium mb-2;
+  color: var(--text-secondary);
+  font-weight: var(--font-medium);
+}
+
+.metric-value {
+  @apply text-2xl font-bold;
+  color: var(--text-primary);
+  font-weight: var(--font-bold);
+}
+
+.metric-change {
+  @apply text-sm flex items-center mt-2;
+}
+
+.metric-change.positive {
+  color: var(--text-success);
+}
+
+.metric-change.negative {
+  color: var(--text-error);
+}
+
+.charts-grid {
+  @apply grid grid-cols-1 lg:grid-cols-2 gap-6;
+}
+
+.chart-card {
+  @apply p-6 rounded-xl border;
+  background: var(--bg-card);
+  border-color: var(--border-primary);
+}
+
+.chart-title {
+  @apply text-lg font-semibold mb-4;
+  color: var(--text-primary);
+  font-weight: var(--font-semibold);
+}
+
+/* Chain Metrics Styles */
+.chain-metrics {
+  @apply space-y-4;
+}
+
+.chain-metric-item {
+  @apply flex items-center justify-between p-4 rounded-lg;
+  background: var(--bg-secondary);
+}
+
+.chain-name {
+  @apply flex items-center space-x-3;
+}
+
+.chain-logo {
+  @apply w-8 h-8 rounded-full;
+}
+
+.chain-label {
+  @apply font-medium;
+  color: var(--text-primary);
+}
+
+.chain-stats {
+  @apply flex items-center space-x-4 text-sm;
+  color: var(--text-secondary);
+}
+
+/* User Stats Styles */
+.user-stats {
+  @apply space-y-6;
+}
+
+.stat-section {
+  @apply p-4 rounded-lg border;
+  background: var(--bg-card);
+  border-color: var(--border-primary);
+}
+
+.stat-header {
+  @apply flex items-center justify-between mb-3;
+}
+
+.stat-title {
+  @apply font-medium;
+  color: var(--text-primary);
+}
+
+.stat-period {
+  @apply text-sm;
+  color: var(--text-secondary);
+}

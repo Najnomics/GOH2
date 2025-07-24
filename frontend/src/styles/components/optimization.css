@@ -1,0 +1,99 @@
+/* Gas Optimization Panel Styles */
+.optimization-panel {
+  @apply rounded-xl p-4 border;
+  background: linear-gradient(135deg, #fef3ff 0%, #f0f9ff 100%);
+  border-color: var(--primary-pink);
+  border-width: 1px;
+}
+
+.optimization-panel.loading {
+  @apply animate-pulse;
+}
+
+.optimization-header {
+  @apply flex items-center justify-between mb-4;
+}
+
+.savings-highlight {
+  @apply flex items-center space-x-2 font-semibold;
+  color: var(--text-success);
+  font-weight: var(--font-semibold);
+}
+
+.savings-icon {
+  @apply text-lg;
+}
+
+.savings-text {
+  font-size: var(--text-sm);
+}
+
+.optimal-chain {
+  @apply flex items-center space-x-2 text-sm;
+  color: var(--text-secondary);
+}
+
+.optimization-body {
+  @apply space-y-3;
+}
+
+.optimization-details {
+  @apply space-y-2;
+}
+
+.optimization-footer {
+  @apply flex items-center justify-between mt-4 pt-4 border-t;
+  border-color: var(--border-primary);
+}
+
+.execution-time {
+  @apply flex items-center space-x-2 text-sm;
+  color: var(--text-secondary);
+}
+
+.bridge-provider {
+  @apply flex items-center space-x-2 text-sm;
+  color: var(--text-tertiary);
+}
+
+/* Chain Comparison Styles */
+.chain-comparison {
+  @apply space-y-2;
+}
+
+.chain-comparison-item {
+  @apply flex items-center justify-between p-2 rounded-lg;
+  background: var(--bg-primary);
+}
+
+.chain-info {
+  @apply flex items-center space-x-2;
+}
+
+.chain-cost {
+  @apply text-sm font-medium;
+  color: var(--text-primary);
+}
+
+/* Savings Breakdown Styles */
+.savings-breakdown {
+  @apply space-y-2;
+}
+
+.cost-item {
+  @apply flex justify-between text-sm;
+}
+
+.cost-label {
+  color: var(--text-secondary);
+}
+
+.cost-value {
+  color: var(--text-primary);
+  font-weight: var(--font-medium);
+}
+
+.cost-savings {
+  color: var(--text-success);
+  font-weight: var(--font-semibold);
+}

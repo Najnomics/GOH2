@@ -1,61 +1,59 @@
-// Swap-related types for the Gas Optimization Hook
-export interface Token {
-  address: string;
-  symbol: string;
-  decimals: number;
-  name: string;
-  logoURI: string;
-  chainId: number;
-  balance?: string;
-  priceUSD?: number;
-}
+import { Token } from './token';
 
 export interface SwapParams {
-  tokenIn: Token;
-  tokenOut: Token;
-  amountIn: string;
-  amountOut: string;
-  slippage: number;
-  deadline: number;
-  recipient: string;
+  token_in: string;
+  token_out: string;
+  amount_in: string;
+  slippage_tolerance?: number;
+  deadline_minutes?: number;
 }
 
 export interface SwapQuote {
   amountIn: string;
   amountOut: string;
   priceImpact: number;
-  route: string[];
-  gasEstimate: string;
-  gasPrice: string;
-  executionTime: number;
+  minimumAmountOut: string;
+  executionPrice: string;
+  route: SwapRoute[];
 }
 
-export interface SwapState {
-  isLoading: boolean;
-  error: string | null;
-  quote: SwapQuote | null;
-  transaction: any | null;
-  status: 'idle' | 'pending' | 'success' | 'error';
+export interface SwapRoute {
+  protocol: string;
+  tokenIn: Token;
+  tokenOut: Token;
+  amountIn: string;
+  amountOut: string;
+  poolFee?: number;
+}
+
+export interface SwapExecution {
+  swap_id: string;
+  status: SwapStatus;
+  transaction_hash?: string;
+  estimated_completion_time?: number;
+}
+
+export enum SwapStatus {
+  PENDING = 'pending',
+  CONFIRMED = 'confirmed',
+  FAILED = 'failed',
+  LOCAL_EXECUTED = 'local_executed',
+  CROSS_CHAIN_INITIATED = 'cross_chain_initiated',
+  BRIDGING = 'bridging',
+  SWAPPING = 'swapping',
+  BRIDGING_BACK = 'bridging_back',
+  COMPLETED = 'completed'
 }
 
 export interface SwapSettings {
-  slippage: number;
-  deadline: number;
-  gasPrice: 'slow' | 'standard' | 'fast' | 'custom';
-  customGasPrice?: string;
-  enableMEVProtection: boolean;
+  slippageTolerance: number; // in percentage
+  deadline: number; // in minutes
+  infiniteApproval: boolean;
+  expertMode: boolean;
 }
 
 export interface PriceImpact {
   percentage: number;
-  severity: 'low' | 'medium' | 'high';
+  severity: 'low' | 'medium' | 'high' | 'very-high';
   warning?: string;
-}
-
-export interface SwapRoute {
-  path: string[];
-  pools: string[];
-  fees: number[];
-  gasEstimate: string;
-  priceImpact: number;
 }

@@ -1,265 +1,199 @@
 import { useState, useCallback, useEffect } from 'react';
-import { useAccount, useChainId } from 'wagmi';
-import { SwapParams, SwapQuote, SwapState, Token } from '../types/swap';
-import { OptimizationQuote } from '../types/optimization';
-import { DEFAULT_SETTINGS } from '../utils/constants';
-import { getLocalStorageItem, setLocalStorageItem } from '../utils/helpers';
-import { swapApi } from '../services/api/swapApi';
-import { useGasOptimization } from './useGasOptimization';
-import { useTokens } from './useTokens';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'react-hot-toast';
+import { Token } from '../types/token';
+import { SwapParams, SwapExecution, SwapQuote, SwapSettings } from '../types/swap';
+import { gasOptimizationApi } from '../services/api/gasOptimizationApi';
 
-export const useSwap = () => {
-  const { address, isConnected } = useAccount();
-  const chainId = useChainId();
-  const { getOptimizationQuote, optimizationQuote, shouldOptimize } = useGasOptimization();
-  const { getTokenBalance } = useTokens();
+interface UseSwapReturn {
+  // State
+  tokenIn: Token | null;
+  tokenOut: Token | null;
+  amountIn: string;
+  amountOut: string;
+  isLoading: boolean;
+  settings: SwapSettings;
+  quote: SwapQuote | null;
   
-  // Swap state
-  const [swapState, setSwapState] = useState<SwapState>({
-    isLoading: false,
-    error: null,
-    quote: null,
-    transaction: null,
-    status: 'idle',
-  });
+  // Actions
+  setTokenIn: (token: Token) => void;
+  setTokenOut: (token: Token) => void;
+  setAmountIn: (amount: string) => void;
+  setSettings: (settings: SwapSettings) => void;
+  flipTokens: () => void;
+  executeSwap: () => Promise<void>;
+  refreshQuote: () => void;
   
-  // Token selection
+  // Computed
+  canSwap: boolean;
+  priceImpact: number;
+  minimumReceived: string;
+  executionPrice: string;
+}
+
+const DEFAULT_SETTINGS: SwapSettings = {
+  slippageTolerance: 0.5,
+  deadline: 30,
+  infiniteApproval: false,
+  expertMode: false,
+};
+
+export const useSwap = (): UseSwapReturn => {
   const [tokenIn, setTokenIn] = useState<Token | null>(null);
   const [tokenOut, setTokenOut] = useState<Token | null>(null);
   const [amountIn, setAmountIn] = useState<string>('');
   const [amountOut, setAmountOut] = useState<string>('');
+  const [settings, setSettings] = useState<SwapSettings>(DEFAULT_SETTINGS);
+  const [quote, setQuote] = useState<SwapQuote | null>(null);
   
-  // Swap settings
-  const [swapSettings, setSwapSettings] = useState(() => {
-    const stored = getLocalStorageItem('gasopt_swap_settings', null);
-    return stored || {
-      slippage: DEFAULT_SETTINGS.SLIPPAGE,
-      deadline: DEFAULT_SETTINGS.DEADLINE,
-      gasPrice: DEFAULT_SETTINGS.GAS_PRICE,
-      customGasPrice: undefined,
-      enableMEVProtection: DEFAULT_SETTINGS.ENABLE_MEV_PROTECTION,
-    };
+  const queryClient = useQueryClient();
+
+  // Fetch quote when parameters change
+  const { 
+    data: quoteData, 
+    isLoading: isQuoteLoading, 
+    refetch: refetchQuote 
+  } = useQuery({
+    queryKey: ['swap-quote', tokenIn?.address, tokenOut?.address, amountIn],
+    queryFn: async () => {
+      if (!tokenIn || !tokenOut || !amountIn || parseFloat(amountIn) <= 0) {
+        return null;
+      }
+
+      const swapParams: SwapParams = {
+        token_in: tokenIn.address,
+        token_out: tokenOut.address,
+        amount_in: amountIn,
+        slippage_tolerance: settings.slippageTolerance,
+        deadline_minutes: settings.deadline,
+      };
+
+      // In a full implementation, this would get a detailed quote
+      // For now, we'll calculate a simple quote
+      const mockQuote: SwapQuote = {
+        amountIn,
+        amountOut: (parseFloat(amountIn) * 0.998).toString(), // Mock 0.2% price impact
+        priceImpact: 0.2,
+        minimumAmountOut: (parseFloat(amountIn) * 0.995).toString(),
+        executionPrice: '1.0',
+        route: [{
+          protocol: 'Uniswap V4',
+          tokenIn,
+          tokenOut,
+          amountIn,
+          amountOut: (parseFloat(amountIn) * 0.998).toString(),
+          poolFee: 3000,
+        }],
+      };
+
+      return mockQuote;
+    },
+    enabled: !!(tokenIn && tokenOut && amountIn && parseFloat(amountIn) > 0),
+    staleTime: 10000, // 10 seconds
+    refetchInterval: 15000, // Refetch every 15 seconds
   });
 
-  // Save settings to localStorage
+  // Update quote and amountOut when quote data changes
   useEffect(() => {
-    setLocalStorageItem('gasopt_swap_settings', swapSettings);
-  }, [swapSettings]);
+    if (quoteData) {
+      setQuote(quoteData);
+      setAmountOut(quoteData.amountOut);
+    } else {
+      setQuote(null);
+      setAmountOut('');
+    }
+  }, [quoteData]);
 
-  // Update swap settings
-  const updateSwapSettings = useCallback((newSettings: Partial<typeof swapSettings>) => {
-    setSwapSettings(prev => ({ ...prev, ...newSettings }));
-  }, []);
+  // Execute swap mutation
+  const swapMutation = useMutation({
+    mutationFn: async () => {
+      if (!tokenIn || !tokenOut || !amountIn) {
+        throw new Error('Missing swap parameters');
+      }
 
-  // Flip token positions
+      const swapParams: SwapParams = {
+        token_in: tokenIn.address,
+        token_out: tokenOut.address,
+        amount_in: amountIn,
+        slippage_tolerance: settings.slippageTolerance,
+        deadline_minutes: settings.deadline,
+      };
+
+      return gasOptimizationApi.executeSwap(swapParams);
+    },
+    onSuccess: (data: SwapExecution) => {
+      toast.success(`Swap initiated! ID: ${data.swap_id}`);
+      
+      // Clear form
+      setAmountIn('');
+      setAmountOut('');
+      setQuote(null);
+      
+      // Refresh balances and other data
+      queryClient.invalidateQueries({ queryKey: ['token-balances'] });
+    },
+    onError: (error: any) => {
+      toast.error(`Swap failed: ${error.message}`);
+      console.error('Swap error:', error);
+    },
+  });
+
   const flipTokens = useCallback(() => {
     if (tokenIn && tokenOut) {
       setTokenIn(tokenOut);
       setTokenOut(tokenIn);
       setAmountIn(amountOut);
-      setAmountOut(amountIn);
+      setAmountOut('');
     }
-  }, [tokenIn, tokenOut, amountIn, amountOut]);
+  }, [tokenIn, tokenOut, amountOut]);
 
-  // Get swap quote
-  const getSwapQuote = useCallback(async (
-    params: SwapParams
-  ): Promise<SwapQuote | null> => {
-    if (!isConnected || !address) {
-      setSwapState(prev => ({ ...prev, error: 'Wallet not connected' }));
-      return null;
-    }
+  const executeSwap = useCallback(async () => {
+    if (!canSwap) return;
+    await swapMutation.mutateAsync();
+  }, [swapMutation, tokenIn, tokenOut, amountIn]);
 
-    setSwapState(prev => ({ 
-      ...prev, 
-      isLoading: true, 
-      error: null,
-      status: 'pending'
-    }));
+  const refreshQuote = useCallback(() => {
+    refetchQuote();
+  }, [refetchQuote]);
 
-    try {
-      const quote = await swapApi.getSwapQuote(params);
-      
-      setSwapState(prev => ({
-        ...prev,
-        quote,
-        isLoading: false,
-        status: 'idle'
-      }));
-      
-      return quote;
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to get swap quote';
-      setSwapState(prev => ({
-        ...prev,
-        error: errorMessage,
-        isLoading: false,
-        status: 'error'
-      }));
-      return null;
-    }
-  }, [address, isConnected]);
+  // Computed values
+  const canSwap = !!(
+    tokenIn && 
+    tokenOut && 
+    amountIn && 
+    parseFloat(amountIn) > 0 && 
+    quote &&
+    !isQuoteLoading &&
+    !swapMutation.isPending
+  );
 
-  // Execute swap
-  const executeSwap = useCallback(async (
-    params: SwapParams,
-    optimization?: OptimizationQuote
-  ) => {
-    if (!isConnected || !address) {
-      setSwapState(prev => ({ ...prev, error: 'Wallet not connected' }));
-      return;
-    }
-
-    setSwapState(prev => ({ 
-      ...prev, 
-      isLoading: true, 
-      error: null,
-      status: 'pending'
-    }));
-
-    try {
-      const transaction = optimization && optimization.shouldOptimize
-        ? await swapApi.executeCrossChainSwap(params, optimization)
-        : await swapApi.executeLocalSwap(params);
-
-      setSwapState(prev => ({
-        ...prev,
-        transaction,
-        isLoading: false,
-        status: 'success'
-      }));
-
-      return transaction;
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to execute swap';
-      setSwapState(prev => ({
-        ...prev,
-        error: errorMessage,
-        isLoading: false,
-        status: 'error'
-      }));
-      throw err;
-    }
-  }, [address, isConnected]);
-
-  // Auto-update amounts and quotes
-  useEffect(() => {
-    const updateAmounts = async () => {
-      if (!tokenIn || !tokenOut || !amountIn || !isConnected) {
-        setAmountOut('');
-        return;
-      }
-
-      const swapParams: SwapParams = {
-        tokenIn,
-        tokenOut,
-        amountIn,
-        amountOut: '',
-        slippage: swapSettings.slippage,
-        deadline: Date.now() + swapSettings.deadline * 60 * 1000,
-        recipient: address!,
-      };
-
-      // Get swap quote
-      const quote = await getSwapQuote(swapParams);
-      if (quote) {
-        setAmountOut(quote.amountOut);
-        
-        // Get optimization quote
-        await getOptimizationQuote({
-          ...swapParams,
-          amountOut: quote.amountOut,
-        });
-      }
-    };
-
-    const timeoutId = setTimeout(updateAmounts, 500); // Debounce
-    return () => clearTimeout(timeoutId);
-  }, [
-    tokenIn,
-    tokenOut,
-    amountIn,
-    swapSettings.slippage,
-    swapSettings.deadline,
-    address,
-    isConnected,
-    getSwapQuote,
-    getOptimizationQuote,
-  ]);
-
-  // Check if swap is ready
-  const canSwap = useCallback((): boolean => {
-    if (!tokenIn || !tokenOut || !amountIn || !isConnected) return false;
-    
-    const balance = getTokenBalance(tokenIn);
-    if (!balance || parseFloat(balance.formatted) < parseFloat(amountIn)) {
-      return false;
-    }
-    
-    return true;
-  }, [tokenIn, tokenOut, amountIn, isConnected, getTokenBalance]);
-
-  // Get swap summary
-  const getSwapSummary = useCallback(() => {
-    if (!tokenIn || !tokenOut || !amountIn || !amountOut) return null;
-    
-    const quote = swapState.quote;
-    const optimization = optimizationQuote;
-    
-    return {
-      tokenIn,
-      tokenOut,
-      amountIn,
-      amountOut,
-      priceImpact: quote?.priceImpact || 0,
-      gasEstimate: quote?.gasEstimate || '0',
-      executionTime: quote?.executionTime || 0,
-      optimization,
-      shouldOptimize: optimization?.shouldOptimize || false,
-      savings: optimization?.savingsUSD || 0,
-      savingsPercent: optimization?.savingsPercent || 0,
-      estimatedTime: optimization?.estimatedTime || quote?.executionTime || 0,
-    };
-  }, [tokenIn, tokenOut, amountIn, amountOut, swapState.quote, optimizationQuote]);
-
-  // Reset swap state
-  const resetSwap = useCallback(() => {
-    setTokenIn(null);
-    setTokenOut(null);
-    setAmountIn('');
-    setAmountOut('');
-    setSwapState({
-      isLoading: false,
-      error: null,
-      quote: null,
-      transaction: null,
-      status: 'idle',
-    });
-  }, []);
+  const priceImpact = quote?.priceImpact || 0;
+  const minimumReceived = quote?.minimumAmountOut || '';
+  const executionPrice = quote?.executionPrice || '';
 
   return {
     // State
-    swapState,
     tokenIn,
     tokenOut,
     amountIn,
     amountOut,
-    swapSettings,
+    isLoading: isQuoteLoading || swapMutation.isPending,
+    settings,
+    quote,
     
     // Actions
     setTokenIn,
     setTokenOut,
     setAmountIn,
-    setAmountOut,
+    setSettings,
     flipTokens,
-    updateSwapSettings,
-    getSwapQuote,
     executeSwap,
-    resetSwap,
+    refreshQuote,
     
-    // Computed values
-    canSwap: canSwap(),
-    swapSummary: getSwapSummary(),
-    isCrossChain: shouldOptimize && optimizationQuote?.shouldOptimize,
+    // Computed
+    canSwap,
+    priceImpact,
+    minimumReceived,
+    executionPrice,
   };
 };

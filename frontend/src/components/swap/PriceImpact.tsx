@@ -1,127 +1,73 @@
 import React from 'react';
-import { motion } from 'framer-motion';
-import { 
-  ExclamationTriangleIcon, 
-  InformationCircleIcon, 
-  XCircleIcon 
-} from '@heroicons/react/24/outline';
-import { formatPercentage } from '../../utils/formatters';
+import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 
 interface PriceImpactProps {
-  impact: number;
-  severity: 'low' | 'medium' | 'high' | 'very-high';
+  priceImpact: number;
   className?: string;
 }
 
-export const PriceImpact: React.FC<PriceImpactProps> = ({
-  impact,
-  severity,
-  className = '',
+export const PriceImpact: React.FC<PriceImpactProps> = ({ 
+  priceImpact, 
+  className = '' 
 }) => {
-  const getSeverityConfig = () => {
+  const getSeverity = (impact: number) => {
+    if (impact < 1) return 'low';
+    if (impact < 3) return 'medium';
+    if (impact < 5) return 'high';
+    return 'very-high';
+  };
+
+  const severity = getSeverity(priceImpact);
+
+  const getStyles = () => {
     switch (severity) {
       case 'low':
-        return {
-          bgColor: 'bg-green-50 dark:bg-green-900/20',
-          borderColor: 'border-green-200 dark:border-green-800',
-          textColor: 'text-green-800 dark:text-green-200',
-          iconColor: 'text-green-600 dark:text-green-400',
-          icon: InformationCircleIcon,
-          label: 'Low Impact',
-          description: 'Minimal price impact on your trade',
-        };
+        return 'text-green-600 bg-green-50 border-green-200';
       case 'medium':
-        return {
-          bgColor: 'bg-yellow-50 dark:bg-yellow-900/20',
-          borderColor: 'border-yellow-200 dark:border-yellow-800',
-          textColor: 'text-yellow-800 dark:text-yellow-200',
-          iconColor: 'text-yellow-600 dark:text-yellow-400',
-          icon: ExclamationTriangleIcon,
-          label: 'Medium Impact',
-          description: 'Moderate price impact - consider reducing amount',
-        };
+        return 'text-yellow-600 bg-yellow-50 border-yellow-200';
       case 'high':
-        return {
-          bgColor: 'bg-orange-50 dark:bg-orange-900/20',
-          borderColor: 'border-orange-200 dark:border-orange-800',
-          textColor: 'text-orange-800 dark:text-orange-200',
-          iconColor: 'text-orange-600 dark:text-orange-400',
-          icon: ExclamationTriangleIcon,
-          label: 'High Impact',
-          description: 'High price impact - proceed with caution',
-        };
+        return 'text-orange-600 bg-orange-50 border-orange-200';
       case 'very-high':
-        return {
-          bgColor: 'bg-red-50 dark:bg-red-900/20',
-          borderColor: 'border-red-200 dark:border-red-800',
-          textColor: 'text-red-800 dark:text-red-200',
-          iconColor: 'text-red-600 dark:text-red-400',
-          icon: XCircleIcon,
-          label: 'Very High Impact',
-          description: 'Extremely high price impact - not recommended',
-        };
+        return 'text-red-600 bg-red-50 border-red-200';
       default:
-        return {
-          bgColor: 'bg-gray-50 dark:bg-gray-800',
-          borderColor: 'border-gray-200 dark:border-gray-700',
-          textColor: 'text-gray-800 dark:text-gray-200',
-          iconColor: 'text-gray-600 dark:text-gray-400',
-          icon: InformationCircleIcon,
-          label: 'Price Impact',
-          description: 'Price impact analysis',
-        };
+        return 'text-gray-600 bg-gray-50 border-gray-200';
     }
   };
 
-  const config = getSeverityConfig();
-  const Icon = config.icon;
+  const getMessage = () => {
+    switch (severity) {
+      case 'low':
+        return 'Low price impact';
+      case 'medium':
+        return 'Moderate price impact';
+      case 'high':
+        return 'High price impact';
+      case 'very-high':
+        return 'Very high price impact';
+      default:
+        return 'Price impact';
+    }
+  };
+
+  if (priceImpact <= 0.1) {
+    return null; // Don't show for very low impact
+  }
 
   return (
-    <motion.div
-      className={`price-impact p-3 rounded-lg border ${config.bgColor} ${config.borderColor} ${className}`}
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ type: 'spring', damping: 20, stiffness: 300 }}
-    >
-      <div className="flex items-center space-x-3">
-        <Icon className={`h-5 w-5 ${config.iconColor}`} />
-        <div className="flex-1">
-          <div className="flex items-center justify-between">
-            <span className={`font-medium ${config.textColor}`}>
-              {config.label}
-            </span>
-            <span className={`font-semibold ${config.textColor}`}>
-              {formatPercentage(impact)}
-            </span>
+    <div className={`flex items-center space-x-2 p-3 rounded-lg border ${getStyles()} ${className}`}>
+      {(severity === 'high' || severity === 'very-high') && (
+        <ExclamationTriangleIcon className="w-5 h-5 flex-shrink-0" />
+      )}
+      <div className="flex-1">
+        <div className="text-sm font-medium">
+          {getMessage()}: {priceImpact.toFixed(2)}%
+        </div>
+        {severity === 'very-high' && (
+          <div className="text-xs mt-1">
+            This swap has a very high price impact. Consider splitting into smaller trades.
           </div>
-          <p className={`text-sm ${config.textColor} opacity-75 mt-1`}>
-            {config.description}
-          </p>
-        </div>
+        )}
       </div>
-
-      {/* Impact Visualization */}
-      <div className="mt-3">
-        <div className="flex justify-between items-center mb-1">
-          <span className={`text-xs ${config.textColor} opacity-75`}>
-            Impact Level
-          </span>
-          <span className={`text-xs ${config.textColor} opacity-75`}>
-            {impact.toFixed(2)}%
-          </span>
-        </div>
-        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-          <div
-            className={`h-2 rounded-full ${
-              severity === 'low' ? 'bg-green-500' :
-              severity === 'medium' ? 'bg-yellow-500' :
-              severity === 'high' ? 'bg-orange-500' :
-              'bg-red-500'
-            }`}
-            style={{ width: `${Math.min(impact * 20, 100)}%` }}
-          />
-        </div>
-      </div>
-    </motion.div>
+    </div>
   );
 };

@@ -1,217 +1,135 @@
-import { useState, useEffect, useCallback } from 'react';
-import { useChainId } from 'wagmi';
-import { GasPrice, ChainMetrics } from '../types/chain';
-import { SUPPORTED_CHAINS } from '../utils/constants';
-import { gasPricesApi } from '../services/api/gasPricesApi';
+import { useState, useCallback } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { ChainGasPrice, ChainInfo } from '../types/chain';
+import { gasOptimizationApi } from '../services/api/gasOptimizationApi';
 
-export const useGasPrices = () => {
-  const chainId = useChainId();
+interface UseGasPricesReturn {
+  // Gas price data
+  gasPrices: Record<string, ChainGasPrice>;
+  chainInfo: ChainInfo[];
   
-  // State
-  const [gasPrices, setGasPrices] = useState<Record<number, GasPrice>>({});
-  const [chainMetrics, setChainMetrics] = useState<Record<number, ChainMetrics>>({});
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [lastUpdated, setLastUpdated] = useState<number>(0);
+  // Loading states
+  isLoadingGasPrices: boolean;
+  isLoadingChains: boolean;
+  
+  // Actions
+  refreshGasPrices: () => void;
+  refreshChains: () => void;
+  
+  // Utilities
+  getGasPriceForChain: (chainId: number) => ChainGasPrice | null;
+  getCheapestChain: () => ChainInfo | null;
+  getMostExpensiveChain: () => ChainInfo | null;
+  getGasPriceTrend: (chainId: number) => 'up' | 'down' | 'stable';
+}
 
-  // Load gas prices for all supported chains
-  const loadGasPrices = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    
-    try {
-      const prices = await gasPricesApi.getAllChainGasPrices();
-      setGasPrices(prices);
-      setLastUpdated(Date.now());
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load gas prices');
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+export const useGasPrices = (): UseGasPricesReturn => {
+  const [previousGasPrices, setPreviousGasPrices] = useState<Record<string, number>>({});
 
-  // Load chain metrics
-  const loadChainMetrics = useCallback(async () => {
-    try {
-      const metrics = await gasPricesApi.getChainMetrics();
-      setChainMetrics(metrics);
-    } catch (err) {
-      console.error('Failed to load chain metrics:', err);
-    }
-  }, []);
-
-  // Get gas price for specific chain
-  const getGasPrice = useCallback((targetChainId: number): GasPrice | null => {
-    return gasPrices[targetChainId] || null;
-  }, [gasPrices]);
-
-  // Get current chain gas price
-  const getCurrentGasPrice = useCallback((): GasPrice | null => {
-    if (!chainId) return null;
-    return getGasPrice(chainId);
-  }, [chainId, getGasPrice]);
-
-  // Get gas price in USD
-  const getGasPriceUSD = useCallback((targetChainId: number, gasLimit: number = 21000): number => {
-    const gasPrice = getGasPrice(targetChainId);
-    const metrics = chainMetrics[targetChainId];
-    
-    if (!gasPrice || !metrics) return 0;
-    
-    const gasCostEth = (gasLimit * gasPrice.standard) / 1e18;
-    return gasCostEth * metrics.gasPriceUSD;
-  }, [getGasPrice, chainMetrics]);
-
-  // Get cheapest chain
-  const getCheapestChain = useCallback((): { chainId: number; gasPrice: GasPrice } | null => {
-    let cheapest: { chainId: number; gasPrice: GasPrice } | null = null;
-    
-    Object.entries(gasPrices).forEach(([chainIdStr, gasPrice]) => {
-      const chainId = parseInt(chainIdStr);
-      if (!cheapest || gasPrice.standard < cheapest.gasPrice.standard) {
-        cheapest = { chainId, gasPrice };
-      }
-    });
-    
-    return cheapest;
-  }, [gasPrices]);
-
-  // Get most expensive chain
-  const getMostExpensiveChain = useCallback((): { chainId: number; gasPrice: GasPrice } | null => {
-    let expensive: { chainId: number; gasPrice: GasPrice } | null = null;
-    
-    Object.entries(gasPrices).forEach(([chainIdStr, gasPrice]) => {
-      const chainId = parseInt(chainIdStr);
-      if (!expensive || gasPrice.standard > expensive.gasPrice.standard) {
-        expensive = { chainId, gasPrice };
-      }
-    });
-    
-    return expensive;
-  }, [gasPrices]);
-
-  // Get gas price trend
-  const getGasTrend = useCallback((targetChainId: number): 'up' | 'down' | 'stable' => {
-    const gasPrice = getGasPrice(targetChainId);
-    return gasPrice?.trend || 'stable';
-  }, [getGasPrice]);
-
-  // Get chain metrics
-  const getChainMetrics = useCallback((targetChainId: number): ChainMetrics | null => {
-    return chainMetrics[targetChainId] || null;
-  }, [chainMetrics]);
-
-  // Compare gas prices across chains
-  const compareGasPrices = useCallback((gasLimit: number = 21000) => {
-    const comparisons: {
-      chainId: number;
-      gasPrice: GasPrice;
-      gasCostUSD: number;
-      savings: number;
-      savingsPercent: number;
-    }[] = [];
-    
-    let maxCost = 0;
-    
-    // First pass: calculate costs
-    Object.entries(gasPrices).forEach(([chainIdStr, gasPrice]) => {
-      const chainId = parseInt(chainIdStr);
-      const gasCostUSD = getGasPriceUSD(chainId, gasLimit);
-      maxCost = Math.max(maxCost, gasCostUSD);
+  // Fetch current gas prices
+  const { 
+    data: gasPricesData = {}, 
+    isLoading: isLoadingGasPrices, 
+    refetch: refetchGasPrices 
+  } = useQuery({
+    queryKey: ['gas-prices'],
+    queryFn: async () => {
+      const data = await gasOptimizationApi.getGasPrices();
       
-      comparisons.push({
-        chainId,
-        gasPrice,
-        gasCostUSD,
-        savings: 0,
-        savingsPercent: 0,
+      // Store previous prices for trend calculation
+      const currentPrices: Record<string, number> = {};
+      Object.entries(data).forEach(([chainId, priceData]: [string, any]) => {
+        currentPrices[chainId] = priceData.gas_price_gwei;
       });
-    });
-    
-    // Second pass: calculate savings
-    return comparisons.map(comp => ({
-      ...comp,
-      savings: maxCost - comp.gasCostUSD,
-      savingsPercent: maxCost > 0 ? ((maxCost - comp.gasCostUSD) / maxCost) * 100 : 0,
-    })).sort((a, b) => a.gasCostUSD - b.gasCostUSD);
-  }, [gasPrices, getGasPriceUSD]);
+      setPreviousGasPrices(prev => ({ ...prev, ...currentPrices }));
+      
+      // Convert to ChainGasPrice format
+      const gasPrices: Record<string, ChainGasPrice> = {};
+      Object.entries(data).forEach(([chainId, priceData]: [string, any]) => {
+        gasPrices[chainId] = {
+          chainId: parseInt(chainId),
+          gasPrice: priceData.gas_price_gwei.toString(),
+          gasPriceUSD: priceData.gas_price_usd.toString(),
+          timestamp: new Date(priceData.timestamp).getTime(),
+        };
+      });
+      
+      return gasPrices;
+    },
+    staleTime: 30 * 1000, // 30 seconds
+    refetchInterval: 60 * 1000, // Refetch every minute
+  });
 
-  // Get gas price alert thresholds
-  const getGasAlerts = useCallback((targetChainId: number) => {
-    const gasPrice = getGasPrice(targetChainId);
-    if (!gasPrice) return null;
-    
-    const standard = gasPrice.standard;
-    
-    return {
-      low: standard * 0.7,      // 30% below standard
-      high: standard * 1.5,     // 50% above standard
-      extreme: standard * 2.0,  // 100% above standard
-    };
-  }, [getGasPrice]);
+  // Fetch chain information
+  const { 
+    data: chainInfo = [], 
+    isLoading: isLoadingChains, 
+    refetch: refetchChains 
+  } = useQuery({
+    queryKey: ['chain-info'],
+    queryFn: () => gasOptimizationApi.getSupportedChains(),
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
 
-  // Check if gas price is stale
-  const isGasPriceStale = useCallback((targetChainId: number, maxAge: number = 300000): boolean => {
-    const gasPrice = getGasPrice(targetChainId);
-    if (!gasPrice) return true;
-    
-    return Date.now() - gasPrice.timestamp > maxAge;
-  }, [getGasPrice]);
+  const getGasPriceForChain = useCallback((chainId: number): ChainGasPrice | null => {
+    return gasPricesData[chainId.toString()] || null;
+  }, [gasPricesData]);
 
-  // Get formatted gas price display
-  const getFormattedGasPrice = useCallback((targetChainId: number, speed: 'slow' | 'standard' | 'fast' | 'instant' = 'standard') => {
-    const gasPrice = getGasPrice(targetChainId);
-    if (!gasPrice) return { gwei: '0', usd: '$0.00' };
+  const getCheapestChain = useCallback((): ChainInfo | null => {
+    if (chainInfo.length === 0) return null;
     
-    const gweiPrice = gasPrice[speed];
-    const usdPrice = getGasPriceUSD(targetChainId, 21000);
-    
-    return {
-      gwei: `${gweiPrice.toFixed(2)} gwei`,
-      usd: `$${usdPrice.toFixed(2)}`,
-    };
-  }, [getGasPrice, getGasPriceUSD]);
+    return chainInfo.reduce((cheapest, chain) => 
+      chain.gas_price_usd < cheapest.gas_price_usd ? chain : cheapest
+    );
+  }, [chainInfo]);
 
-  // Auto-refresh gas prices
-  useEffect(() => {
-    // Load initial data
-    loadGasPrices();
-    loadChainMetrics();
+  const getMostExpensiveChain = useCallback((): ChainInfo | null => {
+    if (chainInfo.length === 0) return null;
     
-    // Set up auto-refresh
-    const intervalId = setInterval(() => {
-      loadGasPrices();
-      loadChainMetrics();
-    }, 30000); // Refresh every 30 seconds
+    return chainInfo.reduce((expensive, chain) => 
+      chain.gas_price_usd > expensive.gas_price_usd ? chain : expensive
+    );
+  }, [chainInfo]);
+
+  const getGasPriceTrend = useCallback((chainId: number): 'up' | 'down' | 'stable' => {
+    const current = gasPricesData[chainId.toString()];
+    const previous = previousGasPrices[chainId.toString()];
     
-    return () => clearInterval(intervalId);
-  }, [loadGasPrices, loadChainMetrics]);
+    if (!current || !previous) return 'stable';
+    
+    const currentPrice = parseFloat(current.gasPrice);
+    const threshold = 0.05; // 5% threshold for trend detection
+    
+    if (currentPrice > previous * (1 + threshold)) return 'up';
+    if (currentPrice < previous * (1 - threshold)) return 'down';
+    return 'stable';
+  }, [gasPricesData, previousGasPrices]);
+
+  const refreshGasPrices = useCallback(() => {
+    refetchGasPrices();
+  }, [refetchGasPrices]);
+
+  const refreshChains = useCallback(() => {
+    refetchChains();
+  }, [refetchChains]);
 
   return {
-    // State
-    gasPrices,
-    chainMetrics,
-    isLoading,
-    error,
-    lastUpdated,
+    // Gas price data
+    gasPrices: gasPricesData,
+    chainInfo,
+    
+    // Loading states
+    isLoadingGasPrices,
+    isLoadingChains,
     
     // Actions
-    loadGasPrices,
-    loadChainMetrics,
-    
-    // Getters
-    getGasPrice,
-    getCurrentGasPrice,
-    getGasPriceUSD,
-    getChainMetrics,
-    getCheapestChain,
-    getMostExpensiveChain,
-    getGasTrend,
-    getGasAlerts,
-    getFormattedGasPrice,
+    refreshGasPrices,
+    refreshChains,
     
     // Utilities
-    compareGasPrices,
-    isGasPriceStale,
+    getGasPriceForChain,
+    getCheapestChain,
+    getMostExpensiveChain,
+    getGasPriceTrend,
   };
 };
